@@ -1,196 +1,50 @@
 # =========================================================
-# APPLICATION WORKLOAD
-# Demo NGINX application deployed by ArgoCD
-# =========================================================
-
-apiVersion: apps/v1
-kind: Deployment
-
-metadata:
-  name: demo-app
-
-  labels:
-    app: demo-app
-    tier: frontend
-    managed-by: argocd
-
-spec:
-
-  # Number of desired Pods
-  replicas: 2
-
-  # ArgoCD/Kubernetes will look for Pods
-  # matching this label
-  selector:
-    matchLabels:
-      app: demo-app
-
-  template:
-    metadata:
-      labels:
-        app: demo-app
-        tier: frontend
-
-    spec:
-      containers:
-
-        # Main application container
-        - name: nginx-web
-
-          # Lightweight nginx image
-          image: nginx:1.27-alpine
-
-          ports:
-            - containerPort: 80
-
-          resources:
-
-            # Guaranteed minimum resources
-            requests:
-              cpu: 50m
-              memory: 32Mi
-
-            # Maximum usable resources
-            limits:
-              cpu: 200m
-              memory: 64Mi
-
----
-
-# =========================================================
-# INTERNAL SERVICE
-# Exposes the Deployment inside the cluster
-# =========================================================
-
-apiVersion: v1
-kind: Service
-
-metadata:
-  name: demo-app-service
-
-  labels:
-    app: demo-app
-    managed-by: argocd
-
-spec:
-
-  # Internal Kubernetes service
-  type: ClusterIP
-
-  # Traffic forwarded to Pods with this label
-  selector:
-    app: demo-app
-
-  ports:
-
-    - name: http
-
-      # Service port
-      port: 80
-
-      # Container port
-      targetPort: 80
-
----
-
-# =========================================================
-# ARGOCD APPLICATION
-# Defines WHAT ArgoCD must deploy
+# SIMPLE ARGOCD DEMO APPLICATION
+# Uses the default ArgoCD project
 # =========================================================
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 
 metadata:
-  name: demo-app
+  name: nginx-demo
   namespace: argocd
 
 spec:
 
-  # Associated ArgoCD project
-  project: platform-dev
+  # Default ArgoCD project
+  project: default
 
   source:
 
-    # Git repository used as source of truth
-    repoURL: https://github.com/desotech-it/DSK213-PUBLIC.git
+    # Official ArgoCD demo repository
+    repoURL: https://github.com/argoproj/argocd-example-apps.git
 
-    # Git branch/tag
-    targetRevision: main
+    # Git branch
+    targetRevision: HEAD
 
-    # Folder containing Kubernetes manifests
-    path: lab02-apps-and-projects/apps/demo
+    # Application path inside repository
+    path: guestbook
 
   destination:
 
-    # Target Kubernetes cluster
+    # In-cluster Kubernetes API
     server: https://kubernetes.default.svc
 
     # Target namespace
-    namespace: dev-demo
+    namespace: demo-nginx
 
   syncPolicy:
 
-    # Automatic synchronization enabled
     automated:
 
-      # Remove obsolete resources
+      # Remove old resources
       prune: true
 
-      # Restore manual changes automatically
+      # Restore drift automatically
       selfHeal: true
 
     syncOptions:
 
-      # Automatically create namespace if missing
+      # Create namespace automatically
       - CreateNamespace=true
-
----
-
-# =========================================================
-# ARGOCD PROJECT
-# Defines permissions and boundaries
-# =========================================================
-
-apiVersion: argoproj.io/v1alpha1
-kind: AppProject
-
-metadata:
-  name: platform-dev
-  namespace: argocd
-
-spec:
-
-  description: Non-production demo workloads
-
-  # Allowed Git repositories
-  sourceRepos:
-    - https://github.com/desotech-it/DSK213-PUBLIC.git
-
-  # Allowed deployment destinations
-  destinations:
-
-    - namespace: dev-*
-      server: https://kubernetes.default.svc
-
-  # Allowed cluster-scoped resources
-  clusterResourceWhitelist:
-
-    - group: ""
-      kind: Namespace
-
-  # Allowed namespace-scoped resources
-  namespaceResourceWhitelist:
-
-    - group: apps
-      kind: Deployment
-
-    - group: ""
-      kind: Service
-
-    - group: ""
-      kind: ConfigMap
-
-  # Warn if resources exist outside Git
-  orphanedResources:
-    warn: true
